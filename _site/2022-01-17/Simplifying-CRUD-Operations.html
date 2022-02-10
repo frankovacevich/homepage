@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Fran.Kova.</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" type="text/css" href="/assets/css/fontawesome-all.min.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon.png">
+
+  <!-- Google Analytics -->
+  
+
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Fran.Kova.</h2>
+        </a>
+        <ul>
+          <li><a href="/">About</a></li>
+          <li><a href="/posts/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <h2 class="post-title">Simplifying CRUD operations</h2>
+  <div class="post-line"></div>
+
+  <h1 id="simplifying-crud-operations">Simplifying CRUD operations</h1>
+
+<p>The four basic database operations are Create, Read, Update and Delete (CRUD).</p>
+
+<p>Typically, applications using HTTP use the request method (GET, POST, PUT and DELETE are the most common) to refer to a specific CRUD operation:</p>
+<ul>
+  <li>GET method = Read</li>
+  <li>POST method = Create</li>
+  <li>PUT method = Update</li>
+  <li>DELETE method = Delete</li>
+</ul>
+
+<p>We can reduce this set of operations to two: READ and WRITE. This would make writing applications easier and allow more flexibility with the communication protocol used. This goes well with PUB/SUB (Publish / Subscribe) communication protocols (like MQTT). In this case, publishing would be equivalent to WRITE and subscribing to READ.</p>
+
+<p>The READ operation would be the same as the Read operation in CRUD, whereas the WRITE operation would replace Create, Update and Delete.</p>
+
+<p>Some database engines already provide an “<em>upsert</em>” method (Update + Insert). The user provides a record with an <em>id</em> and the database either updates the record with the same <em>id</em> or inserts a new record if the <em>id</em> is not found. This is a way of combining the Update and Create operations.</p>
+
+<p>For example (this is pseudocode, where we call some READ and WRITE functions that represent the corresponding operations and we represent the records as json):</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>WRITE({id: 1, value: 11})
+READ() -&gt; [{id: 1, value: 11}]
+
+WRITE({id: 2, value: 22})
+READ() -&gt; [{id: 1, value: 11}, {id: 2, value: 22}]
+
+WRITE({id: 1, value: 0})
+READ() -&gt; [{id: 1, value: 0}, {id: 2, value: 22}]
+</code></pre></div></div>
+<p>In the above example, we inserted two records with <em>ids</em> “1” and “2” and then updated the record with <em>id</em> “1” using only the WRITE function.</p>
+
+<p>Finally, if we want to delete a record, we can set a field called, for example, “<em>deleted</em>”, that marks if the record has been deleted or not. This is a common practice when we want to keep all records even if the user “deletes” them from the front-end application. For instance, if an admin decides to delete a user, the back-end system will probably not remove the record for that user, but rather set a flag as “deleted”. This would allow for later recovery, among other benefits.</p>
+
+<p>This means that the Delete operation becomes an Update operation, where we update the <em>deleted</em> field. We can do this again with our WRITE operation.</p>
+
+<p>Continuing the above example:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>WRITE({id: 1, deleted: true})
+READ() -&gt; [{id: 2, value: 22}]
+</code></pre></div></div>
+
+<p>The READ function ignores all the records that have the field “deleted” set to true.</p>
+
+<p>With this, we have reduced the CRUD operation set to READ and WRITE.</p>
+
+
+
+</div>
+
+<div class="pagination">
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+
+    </main>
+
+    <footer>
+      <span>
+        <time datetime="2022-02-10 13:02:38 -0300">2022</time> - Francisco Kovacevich
+      </span>
+    </footer>
+  </body>
+</html>

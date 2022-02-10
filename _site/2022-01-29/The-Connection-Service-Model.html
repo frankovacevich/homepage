@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Fran.Kova.</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" type="text/css" href="/assets/css/fontawesome-all.min.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon.png">
+
+  <!-- Google Analytics -->
+  
+
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/">
+          <h2 class="nav-title">Fran.Kova.</h2>
+        </a>
+        <ul>
+          <li><a href="/">About</a></li>
+          <li><a href="/posts/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <h2 class="post-title">The Connection-Service Model</h2>
+  <div class="post-line"></div>
+
+  <h1 id="the-connection-service-model-an-idea-for-a-unified-namespace-implementation">The Connection-Service Model: an idea for a Unified Namespace implementation</h1>
+
+<p>We discussed some ideas about the implementation of the Unified Namespace in a previous post. Here, I will go down somewhat deeper, describing a model I call the Connection-Service Model.</p>
+
+<h2 id="the-need-for-a-namespace-provider">The need for a Namespace Provider</h2>
+
+<p>The Unified Namespace is treated as a collection of key - data source pair. Each key identifies a source of data, without needing to know the specific source (be it a database, a machine, a file, the result of an algorithm, etcetera) or have access to it. The Namespace Provider is the link between keys and data sources. A request to the Namespace Provider should be <em>routed</em> to the corresponding resource, and return the data.</p>
+
+<p>Since data sources are scattered across an organization, we say that the Namespace is <em>distributed</em>. We need a Namespace Provider to have access to this distributed data ubiquitously.</p>
+
+<h2 id="read-and-write-functions">Read and write functions</h2>
+
+<p>The Namespace Provider allows users (people, systems, applications, etcetera) to perform two basic tasks:</p>
+<ul>
+  <li>Read from the Namespace (with a given key)</li>
+  <li>Write to the Namespace (to a given key)</li>
+</ul>
+
+<p>It’s important that both operations are consistent. This means, if I write some data to some key, then it’s expected that I (or someone else) can read that same data back.</p>
+
+<p>Data will generally mean a collection of records . Each record will contain a timestamp <code class="language-plaintext highlighter-rouge">t</code>. Thus, we can talk about the data <em>since</em> $t_0$ and <em>until</em> $t_1$, meaning the collection of records with timestamps between those values. Generally, data in an organization is always “queried” by date. Any question that can be asked (for example, what are the current stock levels, how many items are we producing, what are the sales expectations for next month) are a function of time. This means, we could ask what the stock levels was yesterday, how many items we were producing seven days ago and what the sales expectations were a month ago (for this month).</p>
+
+<p>The Namespace Provider will thus fundamentally provide data as a function of time. This means that the <code class="language-plaintext highlighter-rouge">read</code> operation will take (at least) two parameters (apart from the key that we want to read from): <em>since</em> and <em>until</em>. The <code class="language-plaintext highlighter-rouge">write</code> operation will only need the key and the data to write (if the data doesn’t have a timestamp, it could automatically set the timestamp to the current time).</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">read(key, since, until)</code></li>
+  <li><code class="language-plaintext highlighter-rouge">write(key, data)</code></li>
+</ul>
+
+<p>Read and write operations are handled as requests. The user requests to read or write data to the Namespace and the Namespace Provider responds (either with the data requested in the case of read or with a success/error message in the case of write, for example).</p>
+
+<h2 id="connections">Connections</h2>
+
+<p>The Connection-Service Model is a way to understand, represent and implement the different entities that interact with the Namespace. It’s called that way because the fundamental entity is the Connection.</p>
+
+<p>Connections are defined as objects that have two functions, <code class="language-plaintext highlighter-rouge">read</code> and <code class="language-plaintext highlighter-rouge">write</code>. The most important connection is the Namespace Connection, that performs read and write requests to the Namespace Provider.</p>
+
+<p>Other data sources are also connections. For example, we can read tags from a PLC or write some value to a tag. We can read from a database o insert new records. We can read and write to a file. An algorithm is something that we can “read” (i.e. perform the calculation and obtain the result), and which has no write method. All these connections are interfaces that allow us to interact with different sources.</p>
+
+<p>The important thing is that when we “read”, we get some data (a single or multiple records) that has timestamps.</p>
+
+<p>The read and write operations can generally have the same parameters as seen above:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">read(key, since, until)</code></li>
+  <li><code class="language-plaintext highlighter-rouge">write(key, data)</code></li>
+</ul>
+
+<p>Here, <code class="language-plaintext highlighter-rouge">key</code> is something more vague. In a PLC, it might mean the tag we’re trying to read or write. It might be a table in a database or a sheet in an excel file. The key is not necessarily well defined, but we’ll keep it in our read and write operations to make all Connections similar.</p>
+
+<p>As we’ve seen on some examples, the <code class="language-plaintext highlighter-rouge">write</code> operation is optional. However, all connections must have a <code class="language-plaintext highlighter-rouge">read</code> operation.</p>
+
+<h3 id="default-values-for-read-parameters">Default values for read parameters</h3>
+
+<p>Notice that some connections can effectively read data between two timestamps, while some can’t. You might be able to read a database and return only the records that are between <code class="language-plaintext highlighter-rouge">since</code> and <code class="language-plaintext highlighter-rouge">until</code>, but this is not generally possible. A PLC will only allow you to read the present value of tags, not previous values.</p>
+
+<p>We will define the default value for the <code class="language-plaintext highlighter-rouge">since</code> parameter as the “last time the read function was called”, and the <code class="language-plaintext highlighter-rouge">until</code> parameter as the “present moment”. When called for the first time, the <code class="language-plaintext highlighter-rouge">read</code> function should only return the instant, present, value, if it’s available to the connection. Subsequent reads should only return data from the last time the read function was executed.</p>
+
+<p>This means that if we call the read function on a loop, using the default parameters, the connection will always return new values. This is equivalent to be constantly polling a server for new data.</p>
+
+<h3 id="connections-and-mqtt">Connections and MQTT</h3>
+
+<p>An MQTT client is also a connection, since it can read and write to the broker. The <code class="language-plaintext highlighter-rouge">key</code> is, naturally, the topic, and the data is the payload. MQTT connections can return only present values. Subscribing to an MQTT topic is equivalent to calling the read function constantly (in any case, calling <code class="language-plaintext highlighter-rouge">read</code> is equivalent as calling <code class="language-plaintext highlighter-rouge">loop</code> for the client).</p>
+
+<p>An MQTT connection that has clean session set to false will get all messages from the broker even if it was disconnected for some time. This is equivalent as remembering the “last time read” between sessions.</p>
+
+<h3 id="connections-that-allow-extended-reading">Connections that allow extended reading</h3>
+
+<p>Only a few connections will allow you to call the <code class="language-plaintext highlighter-rouge">read</code> function with values for the <em>since</em> and <em>until</em> parameters different than the default ones. We say that these connections allow for <em>extended reading</em>, in contrast to connections that allow only for <em>simple reading</em>.</p>
+
+<p>Connections that allow for extended reading are typically databases. Some files may be able to return data with timestamps, but you may want to treat them as simple-reading only (for example, if you have an excel file, you may want to read only new rows). Some algorithms can also allow extended reading, performing the calculation on different sets of data depending on the values of <em>since</em> and <em>until</em>.</p>
+
+<h3 id="chaining-connections">Chaining connections</h3>
+
+<p>Connections are usually chained to perform a certain result. For example, you can have a database system that, depending on the nature of the data, stores records on different databases. In this case the database system uses two connections to write to each database.</p>
+
+<p>Many complex systems can be broken down to be a simple combination of connections.</p>
+
+<h3 id="reusing-connections">Reusing connections</h3>
+
+<p>Notice that the same connection can be used in different ways in a complex system. For example, a database connection can be used to simply query data, or to perform a complex calculation based on a query on that database (these are two connections chained, first the one that queries the data and then the one doing the calculation). We say that there can be multiple <em>instances</em> of the same connection.</p>
+
+<p>A connection can be as complex and have as many functions as desired. The only condition is that all connections must have a <code class="language-plaintext highlighter-rouge">read</code> method.</p>
+
+<h3 id="opening-and-closing-a-connection">Opening and closing a connection</h3>
+
+<p>Generally, connections should also provide a way to open (initiate) and close (terminate) the connection.</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">open()</code></li>
+  <li><code class="language-plaintext highlighter-rouge">close()</code></li>
+</ul>
+
+<p>We need the connection open when we read, and may never close the connection.</p>
+
+<h3 id="the-namespace-connection">The Namespace Connection</h3>
+
+<p>The most important connection of all is the Namespace Connection. This is the connection that will interact will our Namespace Provider, performing <code class="language-plaintext highlighter-rouge">read</code> and <code class="language-plaintext highlighter-rouge">write</code> requests. We will see how this works later on.</p>
+
+<h2 id="services">Services</h2>
+
+<p>Services are the second core concept of the Connection-Service Model. A service is simply a program that has the following characteristics:</p>
+<ol>
+  <li>It runs constantly (usually in the background)</li>
+  <li>It has (at least) two connections, one of them being an instance of the Namespace Connection, the other being a generic connection (can be any connection, for example, to a PLC) that we call the Main Connection (this is just a generic name, there can be more than one).</li>
+  <li>The two connections may or may not be constantly reading for new values (on a loop).</li>
+  <li>Based on (3), a service may do something based on two possible events:
+    <ul>
+      <li>New data from the Main Connection</li>
+      <li>New data from the Namespace Connection</li>
+    </ul>
+  </li>
+  <li>A Service may accept <em>read requests</em> for a given Namespace key. These requests will execute a <code class="language-plaintext highlighter-rouge">read</code> on the Main Connection and return the result.</li>
+</ol>
+
+<p>A script that reads PLC data and writes it to the Namespace is an example of a service.</p>
+
+<p>A program that reads data from the Namespace on certain keys and writes it to a database is also an example of a service. This service would also be able to accept requests for those same keys and return data with variable <em>since</em> and <em>until</em> parameters.</p>
+
+<p>The PLC service described above should not be able to accept read requests, because it can only provide the present value and not historical values. We will understand how this works better when we learn about the inner workings of the Namespace Provider.</p>
+
+<p>The key concept is that, just as the internet is composed of servers, <strong>the Namespace is composed of services</strong>. It is the collection of constantly running services, accepting read requests and writing data, what makes the Namespace exist. This is the reason why we say that the Namespace is <em>distributed</em>, because there are likely going to be services running on multiple different machines.</p>
+
+<p>To get data from any Namespace key, we would simple need to identify the service that accepts read requests for that key and make a request. This would require having a routing table for each key in the Namespace. The Namespace Provider handles the routing for every client, much like a gateway does for computers in a network.</p>
+
+<p>If a server can accept read requests, it tells the Namespace Provider on start up that it will be listening to requests on some key, so that the Namespace Provider can, when the case arrives, read the data from the service.</p>
+
+<h2 id="applications">Applications</h2>
+
+<p>Applications are programs that, like services, also use connections. However, applications are not constantly running, and thus cannot accept read requests. They are just stand-alone programs that connect to the Namespace with a Namespace Connection and let the user ultimately read and write to certain keys through a GUI or some other interface.</p>
+
+<h2 id="the-role-of-the-namespace-provider">The Role of the Namespace Provider</h2>
+
+<p>Remember that the Namespace Provider is simply a server that accepts read and write requests.</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">read(key, since, until)</code></li>
+  <li><code class="language-plaintext highlighter-rouge">write(key, data)</code></li>
+</ul>
+
+<p>Suppose that we need data from a given key. We make a read request to the Namespace Provider, and expect the data as response. How does the Namespace Provider get the data? When a service starts, it tells the Namespace Provider on which key it accepts read requests. The Namespace Provider then knows where to get the data from, so the read request is forwarded to that service and the service response is then returned to the original user that started the request.</p>
+
+<p>With this logic, the Namespace Provider should also differentiate requests based on the values of <em>since</em> and <em>until</em>. If the data that the user wants is fresh (the instant current value), then the Namespace Provider should get the data from the corresponding sensor-reading service, and if the data is historic, it should get it from some database-storage service.</p>
+
+<p>Fresh data is constantly being required by many users in the Namespace, so instead of requesting data from the plc-reading service, the plc-reading service should <em>write</em> the data to Namespace Provider. The Namespace Provider holds this data on a buffer for as long as it’s required (for some time, until the last potential end user is disconnected or reads the data), and uses this buffer to respond to requests.</p>
+
+<p>Then, when the user requests data from the Namespace Provider, it first checks if it has the data on its buffer (matching key, <em>since</em> and <em>until</em>). If it doesn’t, then it asks the service that can provide the data, passing the request to the service and then returning the data back to the client.</p>
+
+<h2 id="what-is-the-model-good-for">What is the model good for?</h2>
+
+<p>The model is just a conceptual way of implementing a Unified Namespace. It provides a guideline for implementation, and allows us to understand how current systems could be made better.</p>
+
+<p>Connections made point to point are exactly the opposite of the correct way to implement a Namespace. If the Namespace <em>is</em> the collection of services that can respond to requests, then no services running means no namespace.</p>
+
+<p>Data silos exist because the connections to these silos is not made available through a service to other clients, or the connections don’t even exist (remember that all connections must have a <code class="language-plaintext highlighter-rouge">read</code> method). Much of the work required to create a Namespace consists of writing the required connections for each source present.</p>
+
+<p>Many times we find that we lost or can’t access historical data. We say that the Namespace is <strong>complete</strong> if, for every key being written to in the Namespace, there is a service that can accept read requests for that key (and return the required data). Incomplete namespaces are very common. For example, systems that use MQTT can only provide recent data and rely on a database for historical data, but more often than not the database is not connected through a service on the same Namespace (sometimes connections are made directly to the database).</p>
+
+<p>Sometimes the structure for a Namespace exists, but there are so many technologies in place that communicate poorly or not at all with one another. We say that the namespace is <strong>segmented</strong> when there is more than one Namespace Provider, handling different sets of keys. It might be good to have segmented namespaces in some cases (for security and practicality), but in those cases, a <strong>gateway service</strong> must provide complete connection between the two namespaces. Segmented namespaces also mean a lot of unnecessary or redundant code and require quite some effort to make the system function properly.</p>
+
+<h2 id="final-words">Final words</h2>
+
+<p>The previous paragraphs were just an outline of the Connection-Service Model for the Unified Namespace. Much more can be said about it, which I will do under another title.</p>
+
+
+</div>
+
+<div class="pagination">
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+
+    </main>
+
+    <footer>
+      <span>
+        <time datetime="2022-02-10 13:02:38 -0300">2022</time> - Francisco Kovacevich
+      </span>
+    </footer>
+  </body>
+</html>
