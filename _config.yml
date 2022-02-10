@@ -1,7 +1,7 @@
 # Site settings
 title: Fran.Kova.
 domain: "frankovacevich.github.io"
-baseurl: ""
+baseurl: "/site_"
 url: "https://frankovacevich.github.io"
 google_analytics: # Tracking ID, e.g. "UA-000000-01"
 
