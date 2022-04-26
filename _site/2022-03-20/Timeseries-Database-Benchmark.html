@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Fran.Kova.</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/homepage/assets/css/main.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Libre+Baskerville:400,400i,700">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" type="text/css" href="/homepage/assets/css/fontawesome-all.min.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="16x16" href="/homepage/assets/favicon.png">
+
+  <!-- Google Analytics -->
+  
+
+</head>
+
+
+  <body>
+    <nav class="nav">
+      <div class="nav-container">
+        <a href="/homepage/">
+          <h2 class="nav-title">Fran.Kova.</h2>
+        </a>
+        <ul>
+          <li><a href="/homepage/">About</a></li>
+          <li><a href="/homepage/posts/">Posts</a></li>
+        </ul>
+    </div>
+  </nav>
+
+    <main>
+      <div class="post">
+  <h2 class="post-title">Timeseries database benchmark</h2>
+  <div class="post-line"></div>
+
+  <h1 id="timeseries-database-performance-tests">Timeseries database performance tests</h1>
+
+<p>This is going to be just a short post about a simple benchmark for storing timestamped data in different database systems.</p>
+
+<p>NOTE: The benchmark was done in only one afternoon and should not be considered for making important decisions or final conclusions.</p>
+
+<p>The benchmark consisted on writing multiple records of timestamped data into a database and measuring how much time the operation took. The specific conditions under which each test was carried can be inferred from the scripts below. The results can be seen in the following image:</p>
+
+<p><img src="/homepage/assets/img/2022-03-20-timeseries.png" alt="Timeseries" /></p>
+
+<p>As can be seen on the chart, MongoDB outperformed all other database systems, even InfluxDB, whose main use case is timeseries data storage (albeit Influx does much more processing when inserting a new record than what we did with MongoDB, for example, checking that timestamps for a record are unique). The tests labeled with a “2” refer mostly to tests that were done with a record buffer to reduce the number of operations (see the code below). In all cases, an index in the timestamp was created (Influx indexes the <code class="language-plaintext highlighter-rouge">time</code> field automatically).</p>
+
+<p>In a few words, four database systems were tested:</p>
+<ul>
+  <li>InfluxDB 1.8</li>
+  <li>MariaDB</li>
+  <li>Postgres</li>
+  <li>SQLite</li>
+  <li>MongoDB</li>
+</ul>
+
+<p>The system on which the tests were made was a Linux (Lubuntu) virtual machine with 4 processors (Intel i5 8th gen) and 4 gigabytes of RAM. The database were run on docker containers, as per the following commands:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>docker run <span class="nt">-d</span> <span class="nt">-p</span> 8086:8086 <span class="nt">-v</span> influxdb:/var/lib/influxdb influxdb:1.8
+<span class="nb">sudo </span>docker run <span class="nt">-d</span> <span class="nt">-p</span> 3306:3306 <span class="nt">-v</span> mariadb:/var/lib/mysql <span class="nt">-e</span> <span class="nv">MARIADB_ALLOW_EMPTY_ROOT_PASSWORD</span><span class="o">=</span>True mariadb:latest
+<span class="nb">sudo </span>docker run <span class="nt">-d</span> <span class="nt">-p</span> 5432:5432 <span class="nt">-v</span> postgres:/var/lib/postgresql/data <span class="nt">-e</span> <span class="nv">POSTGRES_PASSWORD</span><span class="o">=</span>password postgres
+<span class="nb">sudo </span>docker run <span class="nt">-d</span> <span class="nt">-p</span> 27017:27017 <span class="nt">-v</span> mongodb:/etc/mongo mongo
+</code></pre></div></div>
+
+<p>Python was used for running the tests. The corresponding scripts for each test are copied below:</p>
+
+<ul>
+  <li>Main test class (uses one of the classes below):</li>
+</ul>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">string</span> 
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+
+
+<span class="n">Letters</span> <span class="o">=</span> <span class="p">[</span><span class="s">'a'</span><span class="p">,</span> <span class="s">'b'</span><span class="p">,</span> <span class="s">'c'</span><span class="p">,</span> <span class="s">'d'</span><span class="p">,</span> <span class="s">'e'</span><span class="p">]</span>
+
+
+<span class="k">class</span> <span class="nc">Test</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">test_client</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">series</span> <span class="o">=</span> <span class="p">[</span><span class="s">"Serie"</span> <span class="o">+</span> <span class="n">l</span><span class="p">.</span><span class="n">upper</span><span class="p">()</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">Letters</span><span class="p">]</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">test_record_count</span> <span class="o">=</span> <span class="mi">100</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">test_client</span> <span class="o">=</span> <span class="n">test_client</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">rand_seed</span> <span class="o">=</span> <span class="mi">0</span>
+
+	<span class="c1"># Aux Functions
+</span>	<span class="k">def</span> <span class="nf">rand</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
+		<span class="n">val</span> <span class="o">=</span> <span class="bp">None</span>
+		<span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="nb">bool</span><span class="p">:</span>
+			<span class="n">val</span> <span class="o">=</span> <span class="n">random</span><span class="p">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">0.5</span>
+		<span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="nb">int</span><span class="p">:</span>
+			<span class="n">val</span> <span class="o">=</span> <span class="n">random</span><span class="p">.</span><span class="n">randint</span><span class="p">(</span><span class="o">-</span><span class="mi">999999</span><span class="p">,</span> <span class="mi">999999</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="nb">float</span><span class="p">:</span>
+			<span class="n">val</span> <span class="o">=</span> <span class="n">random</span><span class="p">.</span><span class="n">random</span><span class="p">()</span> <span class="o">*</span> <span class="n">random</span><span class="p">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">99999</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="nb">str</span><span class="p">:</span>
+			<span class="n">val</span> <span class="o">=</span> <span class="s">''</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">random</span><span class="p">.</span><span class="n">choice</span><span class="p">(</span><span class="n">string</span><span class="p">.</span><span class="n">ascii_uppercase</span> <span class="o">+</span> <span class="n">string</span><span class="p">.</span><span class="n">digits</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">50</span><span class="p">))</span>
+
+		<span class="bp">self</span><span class="p">.</span><span class="n">rand_seed</span> <span class="o">+=</span> <span class="mi">1</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="p">.</span><span class="n">rand_seed</span> <span class="o">%</span> <span class="mi">7</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">val</span>
+		<span class="k">return</span> <span class="bp">None</span>
+
+	<span class="k">def</span> <span class="nf">generate_record</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="n">record</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">Letters</span><span class="p">:</span>
+			<span class="n">record</span><span class="p">[</span><span class="n">l</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+			<span class="n">record</span><span class="p">[</span><span class="n">l</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="mi">2</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+			<span class="n">record</span><span class="p">[</span><span class="n">l</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="mi">3</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+			<span class="n">record</span><span class="p">[</span><span class="n">l</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="mi">4</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+		<span class="k">return</span> <span class="p">{</span><span class="n">x</span><span class="p">:</span> <span class="n">record</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">record</span> <span class="k">if</span> <span class="n">record</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">}</span>
+
+	<span class="c1"># Write test
+</span>	<span class="k">def</span> <span class="nf">run_write_test</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="n">elapsed_times</span> <span class="o">=</span> <span class="p">[]</span>
+
+		<span class="c1"># Run a test for each series
+</span>		<span class="k">for</span> <span class="n">serie</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">series</span><span class="p">:</span>
+			<span class="bp">self</span><span class="p">.</span><span class="n">rand_seed</span> <span class="o">=</span> <span class="mi">0</span>
+			<span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Writing records in </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+			<span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="p">.</span><span class="n">time</span><span class="p">()</span>
+			<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="p">.</span><span class="n">test_record_count</span><span class="p">):</span>
+				<span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">generate_record</span><span class="p">()</span>
+				<span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">.</span><span class="n">datetime</span><span class="p">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">datetime</span><span class="p">.</span><span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+				<span class="bp">self</span><span class="p">.</span><span class="n">test_client</span><span class="p">.</span><span class="n">write_one</span><span class="p">(</span><span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+
+			<span class="n">elapsed_time</span> <span class="o">=</span> <span class="n">time</span><span class="p">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span>
+			<span class="k">print</span><span class="p">(</span><span class="sa">f</span><span class="s">"Done writing to </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">. Elapsed time: </span><span class="si">{</span><span class="n">elapsed_time</span><span class="si">}</span><span class="s"> seconds"</span><span class="p">)</span>
+			<span class="n">elapsed_times</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">elapsed_time</span><span class="p">))</span>
+
+		<span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="sa">f</span><span class="s">"results/W_</span><span class="si">{</span><span class="bp">self</span><span class="p">.</span><span class="n">test_client</span><span class="p">.</span><span class="n">name</span><span class="si">}</span><span class="s">_</span><span class="si">{</span><span class="bp">self</span><span class="p">.</span><span class="n">test_record_count</span><span class="si">}</span><span class="s">"</span><span class="p">,</span> <span class="s">"w+"</span><span class="p">)</span>
+		<span class="n">f</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s">"W,</span><span class="si">{</span><span class="bp">self</span><span class="p">.</span><span class="n">test_client</span><span class="p">.</span><span class="n">name</span><span class="si">}</span><span class="s">,</span><span class="si">{</span><span class="bp">self</span><span class="p">.</span><span class="n">test_record_count</span><span class="si">}</span><span class="s">,</span><span class="si">{</span><span class="s">','</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">elapsed_times</span><span class="p">)</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+		<span class="n">f</span><span class="p">.</span><span class="n">close</span><span class="p">()</span>
+</code></pre></div></div>
+
+<ul>
+  <li>InfluxDB</li>
+</ul>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">influxdb</span> <span class="kn">import</span> <span class="n">InfluxDBClient</span>
+
+
+<span class="k">class</span> <span class="nc">InfluxDB1</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">InfluxDBClient</span><span class="p">(</span><span class="s">"localhost"</span><span class="p">,</span> <span class="mi">8086</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s">"test"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"influx"</span>
+
+	<span class="k">def</span> <span class="nf">write_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+		<span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span>  <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">].</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%dT%H:%M:%SZ"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">write_points</span><span class="p">([{</span><span class="s">"measurement"</span><span class="p">:</span> <span class="n">serie</span><span class="p">,</span> <span class="s">"tags"</span><span class="p">:</span> <span class="p">{},</span> <span class="s">"time"</span><span class="p">:</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">],</span> <span class="s">"fields"</span><span class="p">:</span> <span class="n">record</span><span class="p">}])</span>
+
+	<span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">since</span><span class="p">,</span> <span class="n">until</span><span class="p">):</span>
+		<span class="n">since</span> <span class="o">=</span> <span class="n">since</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%dT%H:%M:%SZ"</span><span class="p">)</span>
+		<span class="n">until</span> <span class="o">=</span> <span class="n">until</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%dT%H:%M:%SZ"</span><span class="p">)</span>
+		<span class="n">R</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s">"SELECT a1, a2, a3, a4 FROM </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s"> WHERE time &gt;= '</span><span class="si">{</span><span class="n">since</span><span class="si">}</span><span class="s">' AND time &lt;= '</span><span class="si">{</span><span class="n">until</span><span class="si">}</span><span class="s">'"</span><span class="p">)</span>
+		<span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">R</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+		
+<span class="k">class</span> <span class="nc">InfluxDB2</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">InfluxDBClient</span><span class="p">(</span><span class="s">"localhost"</span><span class="p">,</span> <span class="mi">8086</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s">"test"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"influx2"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span> <span class="o">=</span> <span class="p">[]</span>
+
+	<span class="k">def</span> <span class="nf">write_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+		<span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span>  <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">].</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%dT%H:%M:%SZ"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span><span class="p">.</span><span class="n">append</span><span class="p">({</span><span class="s">"measurement"</span><span class="p">:</span> <span class="n">serie</span><span class="p">,</span> <span class="s">"tags"</span><span class="p">:</span> <span class="p">{},</span> <span class="s">"time"</span><span class="p">:</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">],</span> <span class="s">"fields"</span><span class="p">:</span> <span class="n">record</span><span class="p">})</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span><span class="p">)</span> <span class="o">==</span> <span class="mi">100</span><span class="p">:</span>
+			<span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">write_points</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span><span class="p">)</span>
+			<span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span> <span class="o">=</span> <span class="p">[]</span>
+
+	<span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">since</span><span class="p">,</span> <span class="n">until</span><span class="p">):</span>
+		<span class="n">since</span> <span class="o">=</span> <span class="n">since</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%dT%H:%M:%SZ"</span><span class="p">)</span>
+		<span class="n">until</span> <span class="o">=</span> <span class="n">until</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%dT%H:%M:%SZ"</span><span class="p">)</span>
+		<span class="n">R</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s">"SELECT a1, a2, a3, a4 FROM </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s"> WHERE time &gt;= '</span><span class="si">{</span><span class="n">since</span><span class="si">}</span><span class="s">' AND time &lt;= '</span><span class="si">{</span><span class="n">until</span><span class="si">}</span><span class="s">'"</span><span class="p">)</span>
+		<span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">R</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</code></pre></div></div>
+
+<ul>
+  <li>MariaDB, Postgres and SQLite</li>
+</ul>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">sqlite3</span>
+<span class="kn">import</span> <span class="nn">mysql.connector</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+
+
+
+<span class="k">def</span> <span class="nf">aux_bool_value_</span><span class="p">(</span><span class="n">dbs</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+	<span class="k">if</span> <span class="n">dbs</span> <span class="o">==</span> <span class="s">"postgres"</span><span class="p">:</span> <span class="k">return</span> <span class="s">'TRUE'</span> <span class="k">if</span> <span class="n">v</span> <span class="k">else</span> <span class="s">'FALSE'</span>
+	<span class="k">else</span><span class="p">:</span> <span class="k">return</span> <span class="s">'1'</span> <span class="k">if</span> <span class="n">v</span> <span class="k">else</span> <span class="s">'0'</span>
+
+<span class="c1"># ======================================================================
+# SQL 1
+# ======================================================================
+</span><span class="k">class</span> <span class="nc">Sql1</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">pass</span>
+
+	<span class="k">def</span> <span class="nf">write_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+
+		<span class="c1"># Get time
+</span>		<span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span>  <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">].</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span>
+		<span class="n">t</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span>
+
+		<span class="c1"># Create Table
+</span>		<span class="n">cur</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">cursor</span><span class="p">()</span>
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s">'CREATE TABLE IF NOT EXISTS </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s"> (t TIMESTAMP NOT NULL, field VARCHAR(255) NOT NULL, int_value INTEGER DEFAULT NULL, float_value FLOAT(32) DEFAULT NULL, bool_value BOOL DEFAULT NULL, string_value VARCHAR(255) DEFAULT NULL)'</span><span class="p">)</span>
+
+		<span class="c1"># Create index for time
+</span>		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s">'CREATE INDEX IF NOT EXISTS tidx ON </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s"> (t)'</span><span class="p">)</span>
+
+		<span class="c1"># Insert values for each record
+</span>		<span class="n">q</span> <span class="o">=</span> <span class="sa">f</span><span class="s">"INSERT INTO </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s"> (t, field, bool_value, int_value, float_value, string_value) VALUES "</span>
+		<span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">record</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">field</span> <span class="o">==</span> <span class="s">"time"</span><span class="p">:</span> <span class="k">continue</span>
+			<span class="n">value</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="n">field</span><span class="p">]</span>
+			<span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="bp">None</span> <span class="p">:</span> <span class="k">continue</span>
+
+			<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', </span><span class="si">{</span><span class="n">aux_bool_value_</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">dbs</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s">, NULL, NULL, NULL), "</span>
+			<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', NULL, </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s">, NULL, NULL), "</span>
+			<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', NULL, NULL, </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s">, NULL), "</span>
+			<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', NULL, NULL, NULL, '</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s">'), "</span>
+
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="n">q</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">commit</span><span class="p">()</span>
+
+
+	<span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">since</span><span class="p">,</span> <span class="n">until</span><span class="p">):</span>
+
+		<span class="c1"># Get time
+</span>		<span class="n">since</span> <span class="o">=</span> <span class="n">since</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span>
+		<span class="n">until</span> <span class="o">=</span> <span class="n">until</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span>
+
+		<span class="c1"># Perform query
+</span>		<span class="n">cur</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">cursor</span><span class="p">()</span>
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s">"SELECT * FROM </span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s"> WHERE t&gt;='</span><span class="si">{</span><span class="n">since</span><span class="si">}</span><span class="s">' AND t&lt;='</span><span class="si">{</span><span class="n">until</span><span class="si">}</span><span class="s">' AND (field = 'a1' OR field = 'a2' OR field = 'a3' OR field = 'a4')"</span><span class="p">)</span>
+		<span class="n">R</span> <span class="o">=</span> <span class="n">cur</span><span class="p">.</span><span class="n">fetchall</span><span class="p">()</span>
+		
+		<span class="c1"># Group results by time
+</span>		<span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">R</span><span class="p">:</span>
+			<span class="n">t</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+			<span class="n">field</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+			<span class="n">value</span> <span class="o">=</span> <span class="bp">None</span>
+			<span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+			<span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+			<span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+			<span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+
+			<span class="k">if</span> <span class="n">t</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span> <span class="n">data</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s">"t"</span><span class="p">:</span> <span class="n">t</span><span class="p">}</span>
+			<span class="n">data</span><span class="p">[</span><span class="n">t</span><span class="p">][</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+		<span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="n">values</span><span class="p">())</span>
+
+
+<span class="c1"># ======================================================================
+# SQL2
+# ======================================================================
+</span>
+<span class="k">class</span> <span class="nc">Sql2</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">pass</span>
+
+	<span class="k">def</span> <span class="nf">write_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+		<span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span>  <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">].</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span>
+		<span class="n">t</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="s">"time"</span><span class="p">]</span>
+
+		<span class="n">cur</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">cursor</span><span class="p">()</span>
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s">"CREATE TABLE IF NOT EXISTS data (t TIMESTAMP NOT NULL, serie VARCHAR(255) NOT NULL, field VARCHAR(255) NOT NULL, int_value INTEGER DEFAULT NULL, float_value FLOAT(32) DEFAULT NULL, bool_value BOOL DEFAULT NULL, string_value VARCHAR(255) DEFAULT NULL)"</span><span class="p">)</span>
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s">"CREATE INDEX IF NOT EXISTS tidx ON data (t)"</span><span class="p">)</span>
+
+		<span class="n">q</span> <span class="o">=</span> <span class="sa">f</span><span class="s">"INSERT INTO data (t, serie, field, bool_value, int_value, float_value, string_value) VALUES "</span>
+		<span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">record</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">field</span> <span class="o">==</span> <span class="s">"time"</span><span class="p">:</span> <span class="k">continue</span>
+			<span class="n">value</span> <span class="o">=</span> <span class="n">record</span><span class="p">[</span><span class="n">field</span><span class="p">]</span>
+			<span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="bp">None</span> <span class="p">:</span> <span class="k">continue</span>
+
+			<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', </span><span class="si">{</span><span class="n">aux_bool_value_</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">dbs</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s">, NULL, NULL, NULL), "</span>
+			<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', NULL, </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s">, NULL, NULL), "</span>
+			<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', NULL, NULL, </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s">, NULL), "</span>
+			<span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+				<span class="n">q</span> <span class="o">+=</span> <span class="sa">f</span><span class="s">"('</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">', '</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s">', NULL, NULL, NULL, '</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s">'), "</span>
+
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="n">q</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">commit</span><span class="p">()</span>
+
+
+	<span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">since</span><span class="p">,</span> <span class="n">until</span><span class="p">):</span>
+		<span class="n">since</span> <span class="o">=</span> <span class="n">since</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span>
+		<span class="n">until</span> <span class="o">=</span> <span class="n">until</span><span class="p">.</span><span class="n">strftime</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span>
+
+		<span class="n">cur</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">cursor</span><span class="p">()</span>
+		<span class="n">cur</span><span class="p">.</span><span class="n">execute</span><span class="p">(</span><span class="sa">f</span><span class="s">"SELECT * FROM data WHERE serie = '</span><span class="si">{</span><span class="n">serie</span><span class="si">}</span><span class="s">' AND t&gt;='</span><span class="si">{</span><span class="n">since</span><span class="si">}</span><span class="s">' AND t&lt;='</span><span class="si">{</span><span class="n">until</span><span class="si">}</span><span class="s">' AND (field = 'a1' OR field = 'a2' OR field = 'a3' OR field = 'a4')"</span><span class="p">)</span>
+		<span class="n">R</span> <span class="o">=</span> <span class="n">cur</span><span class="p">.</span><span class="n">fetchall</span><span class="p">()</span>
+		
+		<span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">R</span><span class="p">:</span>
+			<span class="n">t</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+			<span class="n">field</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+			<span class="n">value</span> <span class="o">=</span> <span class="bp">None</span>
+			<span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+			<span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+			<span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+			<span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span> <span class="n">value</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span>
+
+			<span class="k">if</span> <span class="n">t</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span> <span class="n">data</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s">"t"</span><span class="p">:</span> <span class="n">t</span><span class="p">}</span>
+			<span class="n">data</span><span class="p">[</span><span class="n">t</span><span class="p">][</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+		<span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="n">values</span><span class="p">())</span>
+
+
+<span class="c1"># ======================================================================
+# Sqlite
+# ======================================================================
+</span>
+<span class="k">class</span> <span class="nc">Sqlite1</span><span class="p">(</span><span class="n">Sql1</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="s">"testa1.db"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">dbs</span> <span class="o">=</span> <span class="s">"sqlite"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"sqlite1"</span>
+		<span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">Sqlite2</span><span class="p">(</span><span class="n">Sql2</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">sqlite3</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="s">"testa2.db"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">dbs</span> <span class="o">=</span> <span class="s">"sqlite"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"sqlite2"</span>
+		<span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+
+
+<span class="c1"># ======================================================================
+# MariaDB
+# ======================================================================
+</span>
+<span class="k">class</span> <span class="nc">MariaDB1</span><span class="p">(</span><span class="n">Sql1</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">mysql</span><span class="p">.</span><span class="n">connector</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">"localhost"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">3306</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s">"testa1"</span><span class="p">,</span> <span class="n">username</span><span class="o">=</span><span class="s">"root"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s">""</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">dbs</span> <span class="o">=</span> <span class="s">"mariadb"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"mariadb1"</span>
+		<span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">MariaDB2</span><span class="p">(</span><span class="n">Sql2</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">mysql</span><span class="p">.</span><span class="n">connector</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">"localhost"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">3306</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s">"testa2"</span><span class="p">,</span> <span class="n">username</span><span class="o">=</span><span class="s">"root"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s">""</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">dbs</span> <span class="o">=</span> <span class="s">"mariadb"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"mariadb2"</span>
+		<span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+
+
+<span class="c1"># ======================================================================
+# PostgreSQL
+# ======================================================================
+</span>
+<span class="k">class</span> <span class="nc">Postgres1</span><span class="p">(</span><span class="n">Sql1</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">"localhost"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">5432</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s">"testa1"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s">"postgres"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s">"password"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">dbs</span> <span class="o">=</span> <span class="s">"postgres"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"postgres1"</span>
+		<span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">Postgres2</span><span class="p">(</span><span class="n">Sql2</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">"localhost"</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">5432</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s">"testa2"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s">"postgres"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s">"password"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">dbs</span> <span class="o">=</span> <span class="s">"postgres"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"postgres2"</span>
+		<span class="nb">super</span><span class="p">().</span><span class="n">__init__</span><span class="p">()</span>
+</code></pre></div></div>
+
+<ul>
+  <li>MongoDB
+```python
+import pymongo
+import urllib.parse</li>
+</ul>
+
+<p>class MongoDB:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>def __init__(self):
+	self.client = pymongo.MongoClient("mongodb://localhost:27017")
+	self.database = "testA2"
+	self.name = "mongo"
+
+	self.client.drop_database(self.database)
+
+def write_one(self, serie, record):
+	collection = self.client[self.database][serie]  # [database][collection]
+	collection.create_index('time')
+	collection.insert_one(record)
+
+def read(self, serie, since, until):
+	collection = self.client[self.database][serie]  # [database][collection]
+	found = collection.find({"time": {"$gte": since, "$lte": until}}, {"time": True, "a1": True, "a2": True, "a3": True, "a4": True, "_id": False})
+	return [x for x in found if len(x) &gt; 1]
+</code></pre></div></div>
+
+<p>class MongoDB2:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>def __init__(self):
+	self.client = pymongo.MongoClient("mongodb://localhost:27017")
+	self.database = "testA2"
+	self.name = "mongo2"
+	self.buffer = []
+	self.client.drop_database(self.database)
+
+def write_one(self, serie, record):
+	self.buffer.append(record)
+	if len(self.buffer) == 100:
+		collection = self.client[self.database][serie]  # [database][collection]
+		collection.create_index('time')
+		collection.insert_many(self.buffer)
+		self.buffer = []
+
+def read(self, serie, since, until):
+	collection = self.client[self.database][serie]  # [database][collection]
+	found = collection.find({"time": {"$gte": since, "$lte": until}}, {"time": True, "a1": True, "a2": True, "a3": True, "a4": True, "_id": False})
+	return [x for x in found if len(x) &gt; 1] ```
+</code></pre></div></div>
+
+
+
+</div>
+
+<div class="pagination">
+  
+
+  <a href="#" class="top">Top</a>
+</div>
+
+    </main>
+
+    <footer>
+      <span>
+        <time datetime="2022-04-26 20:36:35 -0300">2022</time> - Francisco Kovacevich
+      </span>
+    </footer>
+  </body>
+</html>

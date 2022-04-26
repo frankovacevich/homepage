@@ -6,7 +6,7 @@ NOTE: The benchmark was done in only one afternoon and should not be considered 
 
 The benchmark consisted on writing multiple records of timestamped data into a database and measuring how much time the operation took. The specific conditions under which each test was carried can be inferred from the scripts below. The results can be seen in the following image:
 
-![Timeseries](img/2022-03-20-timeseries.png)
+![Timeseries](/homepage/assets/img/2022-03-20-timeseries.png)
 
 As can be seen on the chart, MongoDB outperformed all other database systems, even InfluxDB, whose main use case is timeseries data storage (albeit Influx does much more processing when inserting a new record than what we did with MongoDB, for example, checking that timestamps for a record are unique). The tests labeled with a "2" refer mostly to tests that were done with a record buffer to reduce the number of operations (see the code below). In all cases, an index in the timestamp was created (Influx indexes the `time` field automatically).
 
@@ -19,7 +19,7 @@ In a few words, four database systems were tested:
 
 The system on which the tests were made was a Linux (Lubuntu) virtual machine with 4 processors (Intel i5 8th gen) and 4 gigabytes of RAM. The database were run on docker containers, as per the following commands:
 
-```
+```shell
 sudo docker run -d -p 8086:8086 -v influxdb:/var/lib/influxdb influxdb:1.8
 sudo docker run -d -p 3306:3306 -v mariadb:/var/lib/mysql -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=True mariadb:latest
 sudo docker run -d -p 5432:5432 -v postgres:/var/lib/postgresql/data -e POSTGRES_PASSWORD=password postgres
@@ -28,8 +28,9 @@ sudo docker run -d -p 27017:27017 -v mongodb:/etc/mongo mongo
 
 Python was used for running the tests. The corresponding scripts for each test are copied below:
 
-- Main test class (uses one of the classes below)
-```
+- Main test class (uses one of the classes below):
+
+```python
 import random
 import string 
 import time
@@ -97,7 +98,8 @@ class Test:
 ```
 
 - InfluxDB
-```
+
+```python
 from influxdb import InfluxDBClient
 
 
@@ -116,8 +118,7 @@ class InfluxDB1:
 		until = until.strftime("%Y-%m-%dT%H:%M:%SZ")
 		R = self.client.query(f"SELECT a1, a2, a3, a4 FROM {serie} WHERE time >= '{since}' AND time <= '{until}'")
 		return list(R)[0]
-
-
+		
 class InfluxDB2:
 
 	def __init__(self):
@@ -140,7 +141,8 @@ class InfluxDB2:
 ```
 
 - MariaDB, Postgres and SQLite
-```
+
+```python
 import sqlite3
 import mysql.connector
 import psycopg2
@@ -339,7 +341,7 @@ class Postgres2(Sql2):
 
 
 - MongoDB
-```
+```python
 import pymongo
 import urllib.parse
 
