@@ -387,53 +387,54 @@
 </code></pre></div></div>
 
 <ul>
-  <li>MongoDB
-```python
-import pymongo
-import urllib.parse</li>
+  <li>MongoDB</li>
 </ul>
 
-<p>class MongoDB:</p>
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pymongo</span>
+<span class="kn">import</span> <span class="nn">urllib.parse</span>
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>def __init__(self):
-	self.client = pymongo.MongoClient("mongodb://localhost:27017")
-	self.database = "testA2"
-	self.name = "mongo"
 
-	self.client.drop_database(self.database)
+<span class="k">class</span> <span class="nc">MongoDB</span><span class="p">:</span>
 
-def write_one(self, serie, record):
-	collection = self.client[self.database][serie]  # [database][collection]
-	collection.create_index('time')
-	collection.insert_one(record)
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">pymongo</span><span class="p">.</span><span class="n">MongoClient</span><span class="p">(</span><span class="s">"mongodb://localhost:27017"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">database</span> <span class="o">=</span> <span class="s">"testA2"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"mongo"</span>
 
-def read(self, serie, since, until):
-	collection = self.client[self.database][serie]  # [database][collection]
-	found = collection.find({"time": {"$gte": since, "$lte": until}}, {"time": True, "a1": True, "a2": True, "a3": True, "a4": True, "_id": False})
-	return [x for x in found if len(x) &gt; 1]
-</code></pre></div></div>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">drop_database</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">database</span><span class="p">)</span>
 
-<p>class MongoDB2:</p>
+	<span class="k">def</span> <span class="nf">write_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+		<span class="n">collection</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">database</span><span class="p">][</span><span class="n">serie</span><span class="p">]</span>  <span class="c1"># [database][collection]
+</span>		<span class="n">collection</span><span class="p">.</span><span class="n">create_index</span><span class="p">(</span><span class="s">'time'</span><span class="p">)</span>
+		<span class="n">collection</span><span class="p">.</span><span class="n">insert_one</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>def __init__(self):
-	self.client = pymongo.MongoClient("mongodb://localhost:27017")
-	self.database = "testA2"
-	self.name = "mongo2"
-	self.buffer = []
-	self.client.drop_database(self.database)
+	<span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">since</span><span class="p">,</span> <span class="n">until</span><span class="p">):</span>
+		<span class="n">collection</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">database</span><span class="p">][</span><span class="n">serie</span><span class="p">]</span>  <span class="c1"># [database][collection]
+</span>		<span class="n">found</span> <span class="o">=</span> <span class="n">collection</span><span class="p">.</span><span class="n">find</span><span class="p">({</span><span class="s">"time"</span><span class="p">:</span> <span class="p">{</span><span class="s">"$gte"</span><span class="p">:</span> <span class="n">since</span><span class="p">,</span> <span class="s">"$lte"</span><span class="p">:</span> <span class="n">until</span><span class="p">}},</span> <span class="p">{</span><span class="s">"time"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a1"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a2"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a3"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a4"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"_id"</span><span class="p">:</span> <span class="bp">False</span><span class="p">})</span>
+		<span class="k">return</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">found</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">]</span>
 
-def write_one(self, serie, record):
-	self.buffer.append(record)
-	if len(self.buffer) == 100:
-		collection = self.client[self.database][serie]  # [database][collection]
-		collection.create_index('time')
-		collection.insert_many(self.buffer)
-		self.buffer = []
 
-def read(self, serie, since, until):
-	collection = self.client[self.database][serie]  # [database][collection]
-	found = collection.find({"time": {"$gte": since, "$lte": until}}, {"time": True, "a1": True, "a2": True, "a3": True, "a4": True, "_id": False})
-	return [x for x in found if len(x) &gt; 1] ```
+<span class="k">class</span> <span class="nc">MongoDB2</span><span class="p">:</span>
+
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">pymongo</span><span class="p">.</span><span class="n">MongoClient</span><span class="p">(</span><span class="s">"mongodb://localhost:27017"</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">database</span> <span class="o">=</span> <span class="s">"testA2"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">"mongo2"</span>
+		<span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">.</span><span class="n">drop_database</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">database</span><span class="p">)</span>
+
+	<span class="k">def</span> <span class="nf">write_one</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span><span class="p">)</span> <span class="o">==</span> <span class="mi">100</span><span class="p">:</span>
+			<span class="n">collection</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">database</span><span class="p">][</span><span class="n">serie</span><span class="p">]</span>  <span class="c1"># [database][collection]
+</span>			<span class="n">collection</span><span class="p">.</span><span class="n">create_index</span><span class="p">(</span><span class="s">'time'</span><span class="p">)</span>
+			<span class="n">collection</span><span class="p">.</span><span class="n">insert_many</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span><span class="p">)</span>
+			<span class="bp">self</span><span class="p">.</span><span class="nb">buffer</span> <span class="o">=</span> <span class="p">[]</span>
+
+	<span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serie</span><span class="p">,</span> <span class="n">since</span><span class="p">,</span> <span class="n">until</span><span class="p">):</span>
+		<span class="n">collection</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">client</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">database</span><span class="p">][</span><span class="n">serie</span><span class="p">]</span>  <span class="c1"># [database][collection]
+</span>		<span class="n">found</span> <span class="o">=</span> <span class="n">collection</span><span class="p">.</span><span class="n">find</span><span class="p">({</span><span class="s">"time"</span><span class="p">:</span> <span class="p">{</span><span class="s">"$gte"</span><span class="p">:</span> <span class="n">since</span><span class="p">,</span> <span class="s">"$lte"</span><span class="p">:</span> <span class="n">until</span><span class="p">}},</span> <span class="p">{</span><span class="s">"time"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a1"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a2"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a3"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"a4"</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span> <span class="s">"_id"</span><span class="p">:</span> <span class="bp">False</span><span class="p">})</span>
+		<span class="k">return</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">found</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">]</span>
 </code></pre></div></div>
 
 
@@ -450,7 +451,7 @@ def read(self, serie, since, until):
 
     <footer>
       <span>
-        <time datetime="2022-04-26 20:36:35 -0300">2022</time> - Francisco Kovacevich
+        <time datetime="2022-04-26 20:45:37 -0300">2022</time> - Francisco Kovacevich
       </span>
     </footer>
   </body>
