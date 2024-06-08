@@ -1,13 +1,11 @@
 ---
 layout: post
-title: Functional Nodes for a Unified Namespace with MQTT
+title: Functional Nodes for UNS with MQTT
 ---
-
-# Functional Nodes for a Unified Namespace with MQTT
 
 ## The need for Functional Nodes
 
-The Unified Namespace is a high-level architectural design pattern that has got a lot of traction in the last few years in the Industrial IoT community [1]. In essence, the UNS conceives all producers and consumers of data in a company structured in a hierarchical way and connected through a single hub. MQTT, a well known pub/sub protocol for IoT, is well suited for this application, as there is a unique broker (hub) connecting different clients, with messages organized in a flexible topic structure (hierarchy).
+The Unified Namespace (UNS) is a high-level architectural design pattern that has got a lot of traction in the last few years in the Industrial IoT community [1]. In essence, the UNS conceives all producers and consumers of data in a company structured in a hierarchical way and connected through a single hub. MQTT, a well known pub/sub protocol for IoT, is well suited for this application, as there is a unique broker (hub) connecting different clients, with messages organized in a flexible topic structure (hierarchy).
 
 Being able to support an architectural design pattern, such as the UNS, on a popular, open-source and established protocol, such as MQTT, makes it accessible (read vendor-agnostic), flexible and easy to implement on a wide range of industrial applications. Consider as an analogy the RESTful design pattern for web APIs: it can be implemented on top of HTTP, using different web frameworks in practically any programming language, and it's thus accessible to every developer and can be used for an endless range of applications. The difference is perhaps that RESTful is a more mature and proven design pattern, whereas the UNS definition is still vague and has some practical limitations.
 
