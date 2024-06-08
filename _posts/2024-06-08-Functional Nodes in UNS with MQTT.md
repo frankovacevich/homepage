@@ -62,7 +62,7 @@ Read Messages allow then a client to know the full state, present and past, of a
 
 ## Conclusion
 
-We can explicitly define a protocol on top of MQTT to handle both real-time events and a request/response style of communication. This would allow us to implement a Unified Namespace where clients can receive real-time data from a node, but also query the present and past state from another client. 
+We can explicitly define a protocol on top of MQTT to handle both real-time events and a request/response style of communication. This would allow us to implement a Unified Namespace where clients can receive real-time data from a node, but also query the present and past state. 
 
 Using different verbs in the MQTT topics, we can accommodate for different different actions: `w` to send real-time changes, `r` to read past data and the whole state of a node, and `c` to send commands requesting changes to the state.
 
