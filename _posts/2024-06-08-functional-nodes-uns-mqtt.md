@@ -1,3 +1,8 @@
+---
+layout: post
+title: Functional Nodes for a Unified Namespace with MQTT
+---
+
 # Functional Nodes for a Unified Namespace with MQTT
 
 ## The need for Functional Nodes
