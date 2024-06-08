@@ -71,12 +71,12 @@ This pattern provides most of the functionality expected from a UNS, using featu
 ## References
 
 
-[1] https://iiot-world.com/smart-manufacturing/uns-101-understanding-the-unified-namespace/
+[1] [https://iiot-world.com/smart-manufacturing/uns-101-understanding-the-unified-namespace/](https://iiot-world.com/smart-manufacturing/uns-101-understanding-the-unified-namespace/)
 
-[2] https://www.hivemq.com/blog/what-is-unified-namespace-uns-iiot-industry-40/
+[2] [https://www.hivemq.com/blog/what-is-unified-namespace-uns-iiot-industry-40/](https://www.hivemq.com/blog/what-is-unified-namespace-uns-iiot-industry-40/)
 
-[3] https://discord.com/channels/738470295056416930/740564843710382080/1248326011616231516
+[3] [https://discord.com/channels/738470295056416930/740564843710382080/1248326011616231516](https://discord.com/channels/738470295056416930/740564843710382080/1248326011616231516)
 
-[4] https://inductiveautomation.com/ignition/
+[4] [https://inductiveautomation.com/ignition/](https://inductiveautomation.com/ignition/)
 
-[5] https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/
+[5] [https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/](https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/)
