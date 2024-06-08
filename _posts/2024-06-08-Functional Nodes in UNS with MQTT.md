@@ -8,7 +8,7 @@ Being able to support an architectural design pattern, such as the UNS, on a pop
 
 One of such limitations is that MQTT, as a pub/sub mechanism, is intended only for real-time communication. There is no built-in way to read past messages (although there is message retention, and maybe another protocol like Kafka could also cover this gap), or to have a request/response style communication between two nodes. For example, if a terminal in a floor shop needs to display a list of all the jobs processed during the day, there is no direct way to relay this information through MQTT from the database or application that holds it (other protocols like OPC-UA also face this issue). The UNS has sometimes been defined as the _Current State_ of the enterprise [2], meaning that perhaps the UNS is not intended to solve this problem. The definition of _Current State_ however is vague. For the example provided, the list of the jobs processed on the date can be interpreted that way: although the information is not being produced at the same moment a user looks at the screen (or loads the application), it does answer the question of "what's going in the plant at this moment".
 
-This problem has been referred to as the need of _Functional Nodes_. They have been vaguely defined by members in the community in the following way [3]:
+This problem has been referred to as the need for _Functional Nodes_. They have been vaguely defined by members in the community in the following way [3]:
 
 > A method or service exposed by a device or system that is mapped as a node or topic in the namespace, and that can be invoked via the UNS broker/hub which will route the request and the results.
 
