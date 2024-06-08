@@ -62,7 +62,13 @@ Read Messages allow then a client to know the full state, present and past, of a
 
 ## Conclusion
 
-We can explicitly defined a protocol that allows MQTT to handle both real-time events and a request/response style of communication. This would allow to implement a Unified Namespace where clients can receive real-time data from a node, but also query the present and past state from another client.
+We can explicitly define a protocol on top of MQTT to handle both real-time events and a request/response style of communication. This would allow us to implement a Unified Namespace where clients can receive real-time data from a node, but also query the present and past state from another client. 
+
+Using different verbs in the MQTT topics, we can accommodate for different different actions: `w` to send real-time changes, `r` to read past data and the whole state of a node, and `c` to send commands requesting changes to the state.
+
+This pattern provides most of the functionality expected from a UNS, using features provided in most MQTT Servers available.
+
+## References
 
 
 [1] https://iiot-world.com/smart-manufacturing/uns-101-understanding-the-unified-namespace/
@@ -74,8 +80,3 @@ We can explicitly defined a protocol that allows MQTT to handle both real-time e
 [4] https://inductiveautomation.com/ignition/
 
 [5] https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/
-
-
-
-
-MQTT is a well-known pub/sub protocol usually used in industrial IoT applications.
