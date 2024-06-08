@@ -20,7 +20,7 @@ Current projects implementing a UNS architecture that face this issue have found
 
 ## Solving the problem within MQTT
 
-It is sensible to say that MQTT was not meant for any kind of historical or big data analysis. However, it is possible to extend the usage of MQTT to allow for request/response style communication. The size limit of the payload in MQTT is 256MB, which should be more than enough for most applications where a list of "past" data points is needed. Consider using the following idea, where `alv1` is just a prefix to identify the protocol:
+It is sensible to say that MQTT was not meant for any kind of historical or big data analysis. However, it is possible to extend the usage of MQTT to allow for request/response style communication. The size limit of the payload in MQTT is 256MB, which should be more than enough for most applications where a list of "past" data points is needed. Consider the following idea, where `alv1` is just a prefix to identify the protocol:
 
 - We have a node `N` in our UNS hierarchy-path, for example defined by the ISA95 standard `enterprise/site/area/line/my-node` (we will use `N` for short).
 - When new data is produced for that node (say, by `Client Z`), it is published on the MQTT topic `alv1/w/N`. We call this a *Write Message*.
