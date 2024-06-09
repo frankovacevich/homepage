@@ -5,9 +5,9 @@ title: Functional Nodes for UNS with MQTT
 
 ## The need for Functional Nodes
 
-The Unified Namespace (UNS) is a high-level architectural design pattern that has got a lot of traction in the last few years in the Industrial IoT community [1]. In essence, the UNS conceives all producers and consumers of data in a company structured in a hierarchical way and connected through a single hub. MQTT, a well known pub/sub protocol for IoT, is well suited for this application, as there is a unique broker (hub) connecting different clients, with messages organized in a flexible topic structure (hierarchy).
+The Unified Namespace (UNS) is a high-level architectural design style that has got a lot of traction in the last few years in the Industrial IoT community [1]. In essence, the UNS conceives all producers and consumers of data in a company structured in a hierarchical way and connected through a single hub. MQTT, a well known pub/sub protocol for IoT, is well suited for this application, as there is a unique broker (hub) connecting different clients, with messages organized in a flexible topic structure (hierarchy).
 
-Being able to support an architectural design pattern, such as the UNS, on a popular, open-source and established protocol, such as MQTT, makes it accessible (read vendor-agnostic), flexible and easy to implement on a wide range of industrial applications. Consider as an analogy the RESTful design pattern for web APIs: it can be implemented on top of HTTP, using different web frameworks in practically any programming language, and it's thus accessible to every developer and can be used for an endless range of applications. The difference is perhaps that RESTful is a more mature and proven design pattern, whereas the UNS definition is still vague and has some practical limitations.
+Being able to support an architecture, such as the UNS, on a popular, open-source and established protocol, such as MQTT, makes it accessible (read vendor-agnostic), flexible and easy to implement on a wide range of industrial applications. Consider as an analogy the RESTful design pattern for web APIs: it can be implemented on top of HTTP, using different web frameworks in practically any programming language, and it's thus accessible to every developer and can be used for an endless range of applications. The difference is perhaps that RESTful is a more mature and proven design pattern, whereas the UNS definition is still vague and has some practical limitations.
 
 One of such limitations is that MQTT, as a pub/sub mechanism, is intended only for real-time communication. There is no built-in way to read past messages (although there is message retention, and maybe another protocol like Kafka could also cover this gap), or to have a request/response style communication between two nodes. For example, if a terminal in a floor shop needs to display a list of all the jobs processed during the day, there is no direct way to relay this information through MQTT from the database or application that holds it (other protocols like OPC-UA also face this issue). The UNS has sometimes been defined as the _Current State_ of the enterprise [2], meaning that perhaps the UNS is not intended to solve this problem. The definition of _Current State_ however is vague. For the example provided, the list of the jobs processed on the date can be interpreted that way: although the information is not being produced at the same moment a user looks at the screen (or loads the application), it does answer the question of "what's going in the plant at this moment".
 
@@ -15,7 +15,7 @@ This problem has been referred to as the need for _Functional Nodes_. They have 
 
 > A method or service exposed by a device or system that is mapped as a node or topic in the namespace, and that can be invoked via the UNS broker/hub which will route the request and the results.
 
-A solution to this problem could be implementing a UNS on top of both MQTT and HTTP (maybe with a REST API), to allow for pub/sub and request/response type of communications. This however increases the complexity of any implementation. For starters, there is no ready-to-use HTTP server that provides this capability, as there is a lot of things that need to be manually set-up. There's also the complexity of handling authentication and authorization (access control policies) on both systems. The beauty of MQTT is that you can get started with a minimal set-up.
+A solution to this problem could be implementing a UNS on top of both MQTT and HTTP (maybe with a REST API, and maybe using WebSockets instead of MQTT, there are many possibilities), to allow for pub/sub and request/response type of communications. This however increases the complexity of any implementation. For starters, there is no ready-to-use HTTP server that provides this capability, as there is a lot of things that need to be manually set-up. There's also the complexity of handling authentication and authorization (access control policies) on both systems. The beauty of MQTT is that you can get started with a minimal set-up.
 
 Another alternative is to constantly publish the data required with some (relatively high) frequency, so that it is always available if a client needs it. The downside is of course heavily increasing the network traffic with unsolicited messages, and that there is no way to specify how to query the data beforehand (different clients may need different query parameters).
 
@@ -23,7 +23,7 @@ Current projects implementing a UNS architecture that face this issue have found
 
 ## Solving the problem within MQTT
 
-It is sensible to say that MQTT was not meant for any kind of historical or big data analysis. However, it is possible to extend the usage of MQTT to allow for request/response style communication. The size limit of the payload in MQTT is 256MB, which should be more than enough for most applications where a list of "past" data points is needed. Consider the following idea, where `alv1` is just a prefix to identify the protocol:
+It is sensible to say that MQTT was not meant for any kind of historical or big data analysis. However, it is possible to extend the usage of MQTT to allow for request/response style communication. The size limit of the payload in MQTT is 256MB, which should be more than enough for most applications where a list of "past" data points is needed. Consider the following idea (I call it the *Aleph Protocol*), where `alv1` is just a prefix to identify the protocol:
 
 - We have a node `N` in our UNS hierarchy-path, for example defined by the ISA95 standard `enterprise/site/area/line/my-node` (we will use `N` for short).
 - When new data is produced for that node (say, by `Client Z`), it is published on the MQTT topic `alv1/w/N`. We call this a *Write Message*.
@@ -55,13 +55,13 @@ Notice that we use the word Read Message and not Request Message. This is to mak
 
 For this kind of situations, we can use a *Command Message* (with a `c` in the topic structure, like `alv1/c/N`). Command Messages are different from Write Messages in the sense that the former are a request for data to change, whereas the latter is an actual event that contains the new data. A Command Message will usually be followed by a Write Message, if the command is successfully executed. A command can be anything requesting a change, like an operator wanting to update a valve position from an HMI, or a web application trying to delete a record on an ERP database on behalf of a user. It is not difficult to extend the Access Control policies to allow for Command Messages.
 
-## Analogy with Event-Driven Design
+## Analogy with Event-Driven Architecture
 
-In the context of Event-Driven Design [4], Write and Command Messages are analogue to Events and Commands:
+In the context of Event-Driven Architecture [5], Write and Command Messages are analogue to Events and Commands:
 
 > A command is an object that is sent to the domain for a state change which is handled by a command handler. [...] An event is a statement of fact about what change has been made to the domain state.
 
-Read Messages allow then a client to know the full state, present and past, of a node in the UNS. If we follow the principle of Report by Exception ("producers publish data to the UNS only when they detect changes in the monitored value" [5]), then subscribing to the real-time updates of a node (`alv1/w/N` in the examples above) is not enough to know about the current state of that node. More explicitly, if a node value changes infrequently, and a client wants to know now the current value (for example to display in a web interface), then it should resort to a Read Message to get the last value.
+Read Messages allow then a client to know the full state, present and past, of a node in the UNS. If we follow the principle of Report by Exception ("producers publish data to the UNS only when they detect changes in the monitored value" [6]), then subscribing to the real-time updates of a node (`alv1/w/N` in the examples above) is not enough to know about the current state of that node. More explicitly, if a node value changes infrequently, and a client wants to know now the current value (for example to display in a web interface), then it should resort to a Read Message to get the last value.
 
 ## Conclusion
 
@@ -82,4 +82,6 @@ This pattern provides most of the functionality expected from a UNS, using featu
 
 [4] [https://inductiveautomation.com/ignition/](https://inductiveautomation.com/ignition/)
 
-[5] [https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/](https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/)
+[5] [https://medium.com/ingeniouslysimple/command-vs-event-in-domain-driven-design-be6c45be52a9](https://medium.com/ingeniouslysimple/command-vs-event-in-domain-driven-design-be6c45be52a9)
+
+[6] [https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/](https://www.hivemq.com/blog/implementing-unified-namespace-uns-mqtt-sparkplug/)
