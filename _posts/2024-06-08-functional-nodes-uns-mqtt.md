@@ -30,9 +30,9 @@ It is sensible to say that MQTT was not meant for any kind of historical or big 
 - If `Client A` wants to receive the produced data in real-time, it can subscribe to that same topic (`alv1/w/N`).
 - Another `Client B` is connected to the database that holds this data (perhaps this client is also subscribed to `alv/w/N` and stored the data in the database itself). This client is listening to the MQTT topic `alv1/r/N`, and will receive any *Read Message* published on this topic.
 - `Client A` can now also query past data available through `Client B`. To do so, it does the following:
-    1. `Client A` generates a random number `x` to identify the request.
+    1. `Client A` uses a unique number `x` to identify the response channel. Each client has a unique channel that it receive responses on, assigned at the moment the client is created (it can be for example a hash of the client id).
     2. `Client A` subscribes to the MQTT topic `alv1/x/N`.
-    3. `Client A` publishes an MQTT message on `alv1/r/N`, with the number `x` on the payload. Other query parameters could also be included in the payload.
+    3. `Client A` publishes an MQTT message on `alv1/r/N`, with the channel `x` on the payload (something like `response_channel: x`). Other query parameters could also be included in the payload.
     4. `Client B` is subscribed to `alv1/r/N` and receives the read message. It queries the database with the parameters passed.
     5. `Client B` publishes the query results to `alv1/x/N`.
     6. `Client A` is subscribed to `alv1/x/N` and receives the message. We call this a *Response Message*.
@@ -45,9 +45,9 @@ Access Control can also be set up the following way:
 - `Client A` can receive real-time data from node `N`, so it has permission to subscribe to `alv1/w/N`.
 - `Client B` can receive Read Messages on node `N`, so it has permissions to subscribe to `alv1/r/N`.
 - `Client B` should also be able to send back a Response Message for every Read Message, so it needs permissions to publish to `alv1/+/N`. Notice the `+` wildcard used. Notice this also covers `alv1/w/N`, which is useful if the same client also sends real-time updates. Otherwise, it needs to be restricted from writing to this topic.
-- `Client A` needs to be able to receive the Response Message, so it needs permissions to subscribe to `alv1/+/N`. Notice that this also includes `alv1/w/N`, meaning by default a client with access to node `N` only needs subscription access to `alv1/+/N` for real-time and "historical" data.
+- `Client A` needs to be able to receive the Response Message, so it needs permissions to subscribe to `alv1/x/N`. 
 
-The weak point with this structure is that any client can be listening to any Response Message. For example, if `Client A` sends a Read Message for node `N`, any other `Client C`  could intercept the Response Message. However, this only happens if `Client C` has permissions to subscribe to `alv1/+/N`, and in that case it could get the same data from `Client B` (the one responding to the Read Message) directly anyways.
+We can also add a random number to identify each request, so that multiple requests sent by `Client A` can be tracked individually as the responses come back. The client needs to unsubscribe to `alv1/x/N` once all the responses are received (or it decides to time out).
 
 ## Extending the Message types
 
